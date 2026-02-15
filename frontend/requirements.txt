@@ -1,4 +1,15 @@
 fastapi
 uvicorn[standard]
+
 jinja2
 python-multipart
+itsdangerous
+
+python-dotenv
+
+sqlalchemy
+
+boto3
+requests
+
+stripe
