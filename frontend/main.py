@@ -64,11 +64,11 @@ UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 app.mount(
     "/static",
-    StaticFiles(directory="frontend/static"),
+    StaticFiles(directory="static"),
     name="static"
 )
 
-templates = Jinja2Templates(directory="frontend/templates")
+templates = Jinja2Templates(directory="templates")
 
 # ─────────────────────────────
 # AWS
