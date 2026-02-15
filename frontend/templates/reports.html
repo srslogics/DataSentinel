@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Reports · DataSentinel{% endblock %}
+
+{% block content %}
+
+<section class="panel">
+    <h2>Reports</h2>
+
+    <p style="color:#94a3b8; margin-bottom:16px;">
+        Consolidated history of all pipeline executions across validation,
+        normalization, conversion, and profiling.
+    </p>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Module</th>
+                <th>File</th>
+                <th>Status</th>
+                <th>Timestamp</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% if history %}
+                {% for r in history %}
+                <tr>
+                    <td>{{ r.module }}</td>
+                    <td>{{ r.file }}</td>
+                    <td class="ok">{{ r.status }}</td>
+                    <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                    <td>
+                        <a href="{{ r.view }}" class="btn-ghost">
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5"
+                        style="text-align:center; color:#64748b; padding:24px;">
+                        No reports yet. Run a validation, normalization,
+                        conversion, or profiling job to get started.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}

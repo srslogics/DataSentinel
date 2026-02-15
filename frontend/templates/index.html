@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DataSentinel</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='css/landing.css') }}">
+</head>
+
+<body class="landing">
+
+<!-- Topbar -->
+<header class="topbar">
+    <div class="topbar-left">
+        <img src="{{ url_for('static', path='images/logo.png') }}" class="logo-img" />
+        <span class="logo-text">DataSentinel</span>
+        <span class="status">● System Healthy</span>
+    </div>
+
+    <div class="topbar-right">
+        <a href="{{ url_for('login_page') }}" class="btn-primary">Login</a>
+    </div>
+</header>
+
+<!-- Main -->
+<main class="landing-shell">
+
+    <!-- LEFT -->
+    <section class="landing-left">
+        <h1>DataSentinel</h1>
+        <p class="subtitle">
+            Automated data quality enforcement layer
+        </p>
+
+        <div class="flow-diagram">
+            <span class="node">Source</span>
+            <span class="arrow">→</span>
+            <span class="node active">DataSentinel</span>
+            <span class="arrow">→</span>
+            <span class="node">Clean Data</span>
+        </div>
+
+        <ul class="capabilities">
+            <li>Schema & rule validation</li>
+            <li>Normalization & standardization</li>
+            <li>Statistical profiling</li>
+            <li>Failure prediction</li>
+        </ul>
+    </section>
+
+    <!-- RIGHT -->
+    <section class="landing-right">
+        <div class="action-card">
+            <h2>Access Console</h2>
+
+            <a href="{{ url_for('login_page') }}" class="btn-primary full">
+                Login
+            </a>
+
+            <a href="/datasentinel/docs" class="btn-secondary full">
+                API Documentation
+            </a>
+
+            <p class="hint">Secure, session-based access</p>
+        </div>
+    </section>
+
+</main>
+
+<!-- Footer -->
+<footer class="footer minimal">
+    © SRS Logics · DataSentinel
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>{% block title %}DataSentinel{% endblock %}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+</head>
+
+<body class="app">
+
+<!-- Topbar -->
+<header class="topbar">
+    <div class="topbar-left">
+        <img src="{{ url_for('static', path='images/logo.png') }}" class="logo-img" />
+        <span class="logo-text">DataSentinel</span>
+        <span class="status">● System Healthy</span>
+    </div>
+
+    <div class="topbar-right">
+        <span class="user">{{ user.name }}</span>
+        <a href="/datasentinel/logout" class="btn-ghost">Logout</a>
+    </div>
+</header>
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+
+        <div class="sidebar-header">Navigation</div>
+
+        <div class="sidebar-section">Core</div>
+
+        <a href="/datasentinel/dashboard"
+           class="{% if request.url.path.endswith('/dashboard') %}active{% endif %}">
+            Dashboard
+        </a>
+
+        <a href="/datasentinel/validation"
+           class="{% if request.url.path.endswith('/validation') %}active{% endif %}">
+            Validation
+        </a>
+
+        <a href="/datasentinel/normalization"
+           class="{% if request.url.path.endswith('/normalization') %}active{% endif %}">
+            Normalization
+        </a>
+
+        <a href="/datasentinel/convert"
+           class="{% if request.url.path.endswith('/convert') %}active{% endif %}">
+            Conversion
+        </a>
+
+        <a href="/datasentinel/profiling"
+           class="{% if request.url.path.endswith('/profiling') %}active{% endif %}">
+            Profiling
+        </a>
+
+        <a href="/datasentinel/prediction"
+            class="pro {% if request.url.path.endswith('/prediction') %}active{% endif %}">
+                Prediction
+                <span class="pro-badge">PRO</span>
+            </a>
+
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">Insights</div>
+        <a href="/datasentinel/reports"
+           class="{% if request.url.path.endswith('/reports') %}active{% endif %}">
+            Reports
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">System</div>
+        <a href="/datasentinel/settings">Settings</a>
+        <a href="/datasentinel/logout">Logout</a>
+
+    </aside>
+
+    <!-- Main content -->
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+
+</div>
+
+</body>
+</html>

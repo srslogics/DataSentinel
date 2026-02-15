@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Validation Result{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h2>Validation Result</h2>
+
+    <p><strong>File:</strong> {{ record.input_file }}</p>
+    <p><strong>Status:</strong> {{ record.status }}</p>
+    <p><strong>Run at:</strong> {{ record.created_at }}</p>
+
+    <p style="color:#94a3b8; margin-top:16px;">
+        Detailed rule failures will appear here.
+    </p>
+</section>
+{% endblock %}

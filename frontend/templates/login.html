@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login · DataSentinel</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='css/landing.css') }}">
+</head>
+
+<body class="landing">
+
+<!-- Topbar -->
+<header class="topbar">
+    <div class="topbar-left">
+        <img src="{{ url_for('static', path='images/logo.png') }}" class="logo-img" />
+        <span class="logo-text">DataSentinel</span>
+    </div>
+
+    <div class="topbar-right">
+        <a href="/datasentinel" class="btn-secondary">Back</a>
+    </div>
+</header>
+
+<!-- Main -->
+<main class="landing-shell">
+
+    <!-- Left: Context -->
+    <section class="landing-left">
+        <h1>Access Console</h1>
+        <p class="subtitle">
+            Secure, session-based access to the DataSentinel control plane.
+        </p>
+
+        <ul class="capabilities">
+            <li>Email-based authentication</li>
+            <li>No passwords stored</li>
+            <li>Enterprise-friendly access model</li>
+        </ul>
+    </section>
+
+    <!-- Right: Login Card -->
+    <section class="landing-right">
+        <div class="action-card">
+            <h2>Login</h2>
+
+            <form method="post" action="{{ url_for('login_submit') }}">
+                <input
+                    type="email"
+                    name="email"
+                    placeholder="you@company.com"
+                    required
+                    autofocus
+                    class="login-input"
+                />
+
+                <button type="submit" class="btn-primary full">
+                    Continue
+                </button>
+            </form>
+
+            <p class="hint">
+                We’ll create an account automatically if you’re new.
+            </p>
+        </div>
+    </section>
+
+</main>
+
+<!-- Footer -->
+<footer class="footer minimal">
+    © SRS Logics · DataSentinel
+</footer>
+
+</body>
+</html>

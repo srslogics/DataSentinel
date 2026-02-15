@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="panel">
+  <h2>Normalization</h2>
+
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="file" required />
+    <button class="btn-primary">Normalize</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>History</h2>
+  {% for r in records %}
+    <div>{{ r.input_file }} → {{ r.normalized_file }}</div>
+  {% else %}
+    <div class="muted">No runs yet</div>
+  {% endfor %}
+</section>
+
+{% endblock %}

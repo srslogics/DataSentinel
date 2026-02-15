@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="panel">
+  <h2>Profiling</h2>
+
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="file" required />
+    <button class="btn-primary">Generate Profile</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Reports</h2>
+  {% for r in records %}
+    <div>{{ r.input_file }} → <a href="{{ r.profile_url }}">View</a></div>
+  {% else %}
+    <div class="muted">No profiles yet</div>
+  {% endfor %}
+</section>
+
+{% endblock %}

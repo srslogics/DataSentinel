@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · DataSentinel{% endblock %}
+
+{% block content %}
+
+<section class="panel" style="max-width:720px;">
+    <h2>Account Settings</h2>
+
+    <p style="color:#94a3b8; margin-bottom:24px;">
+        Manage your account and subscription preferences.
+    </p>
+
+    <!-- Account Info -->
+    <div style="margin-bottom:28px;">
+        <h3 style="font-size:0.9rem; margin-bottom:8px;">Account</h3>
+
+        <div style="font-size:0.85rem; color:#cbd5f5;">
+            <div><strong>Email:</strong> {{ user.email }}</div>
+            <div><strong>Name:</strong> {{ user.name }}</div>
+            <div><strong>Plan:</strong>
+                {% if user.get("is_pro") %}
+                    Pro
+                {% else %}
+                    Free
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Subscription -->
+    <div style="margin-bottom:28px;">
+        <h3 style="font-size:0.9rem; margin-bottom:8px;">Subscription</h3>
+
+        {% if user.get("is_pro") %}
+            <p style="color:#22c55e;">You are on the Pro plan.</p>
+        {% else %}
+            <p style="color:#94a3b8; margin-bottom:12px;">
+                Upgrade to Pro to unlock Prediction and advanced analytics.
+            </p>
+            <a href="/datasentinel/subscribe/pro" class="btn-primary">
+                Upgrade to Pro
+            </a>
+        {% endif %}
+    </div>
+
+    <!-- Danger Zone -->
+    <div>
+        <h3 style="font-size:0.9rem; margin-bottom:8px; color:#f87171;">
+            Session
+        </h3>
+
+        <a href="/datasentinel/logout" class="btn-ghost">
+            Logout
+        </a>
+    </div>
+</section>
+
+{% endblock %}

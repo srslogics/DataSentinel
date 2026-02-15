@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Profile Report{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h2>Profile Report</h2>
+
+    <p><strong>File:</strong> {{ record.input_file }}</p>
+
+    <a href="{{ record.profile_url }}" class="btn-primary">
+        Open Profile
+    </a>
+</section>
+{% endblock %}
