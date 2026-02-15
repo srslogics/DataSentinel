@@ -33,8 +33,6 @@ from models import (
 from stripe_utils import create_checkout_session
 
 
-from .stripe_utils import create_checkout_session
-
 
 
 
