@@ -20,8 +20,8 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from .database import SessionLocal, engine
-from .models import (
+from database import SessionLocal, engine
+from models import (
     Base,
     User,
     ValidationResult,
@@ -30,6 +30,8 @@ from .models import (
     ProfileResult,
     PredictionResult
 )
+from stripe_utils import create_checkout_session
+
 
 from .stripe_utils import create_checkout_session
 
