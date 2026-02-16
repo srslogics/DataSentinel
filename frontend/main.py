@@ -120,7 +120,8 @@ async def login_submit(
 ):
     email = email.lower().strip()
 
-    db: Session = SessionLocal()
+    db = SessionLocal()
+
     user = db.query(User).filter(User.email == email).first()
 
     if not user:
@@ -131,13 +132,18 @@ async def login_submit(
         )
         db.add(user)
         db.commit()
+        db.refresh(user)  # ✅ important
+
+    # ⬇️ extract data while session is alive
+    user_data = {
+        "email": user.email,
+        "name": user.name,
+    }
 
     db.close()
 
-    request.session["user"] = {
-        "email": user.email,
-        "name": user.name
-    }
+    request.session["user"] = user_data
+
 
     return RedirectResponse(
         "/datasentinel/dashboard",
