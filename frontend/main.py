@@ -36,8 +36,7 @@ from stripe_utils import create_checkout_session
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
-    title="DataSentinel",
-    root_path="/datasentinel"
+    title="DataSentinel"
 )
 
 app.add_middleware(
