@@ -92,7 +92,7 @@ def require_pro(user: dict) -> bool:
 # ─────────────────────────────
 # Health
 # ─────────────────────────────
-
+@app.head("/health")
 @app.get("/health")
 def health():
     return {"status": "ok"}
