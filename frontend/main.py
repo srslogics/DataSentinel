@@ -1,25 +1,21 @@
 from fastapi import (
-    FastAPI, Request, UploadFile, File, Form
+    FastAPI, Request, UploadFile, File, Form, HTTPException
 )
-from fastapi.responses import (
-    JSONResponse, HTMLResponse, RedirectResponse
-)
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from dotenv import load_dotenv
-from datetime import datetime
-import os
-import shutil
-import uuid
-import logging
-import boto3
-import requests
-from pathlib import Path
-
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+
+from pathlib import Path
+from datetime import datetime
+import uuid
+import os
+import shutil
+import logging
+
 from database import SessionLocal, engine
 from models import (
     Base,
@@ -30,75 +26,75 @@ from models import (
     ProfileResult,
     PredictionResult
 )
+
 from stripe_utils import create_checkout_session
-
-
-
-
 
 # ─────────────────────────────
 # App Setup
 # ─────────────────────────────
 
-load_dotenv()
 logging.basicConfig(level=logging.INFO)
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="DataSentinel",
-    root_path="/datasentinel",
-    docs_url="/docs",
-    openapi_url="/openapi.json"
+    root_path="/datasentinel"
 )
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("SECRET_KEY", "change-me"),
+    secret_key=os.environ.get("SECRET_KEY", "dev-secret"),
     same_site="lax",
-    https_only=True
+    https_only=False  # REQUIRED for Render
 )
 
-# Static + Templates
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
-app.mount(
-    "/static",
-    StaticFiles(directory="static"),
-    name="static"
-)
+BASE_DIR = Path(__file__).parent
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 # ─────────────────────────────
-# AWS
+# Database init (MVP only)
 # ─────────────────────────────
 
-s3 = boto3.client("s3")
-BUCKET_NAME = os.environ.get("DATA_BUCKET", "datumsync-prod")
-BACKEND_API_URL = os.environ.get("BACKEND_API_URL")
+Base.metadata.create_all(bind=engine)
 
 # ─────────────────────────────
-# Helpers
+# Upload directories
 # ─────────────────────────────
 
-def require_user(request: Request):
+UPLOAD_ROOT = BASE_DIR / "uploads"
+VALIDATION_DIR = UPLOAD_ROOT / "validation"
+NORMALIZATION_DIR = UPLOAD_ROOT / "normalization"
+CONVERSION_DIR = UPLOAD_ROOT / "conversion"
+PROFILING_DIR = UPLOAD_ROOT / "profiling"
+
+for d in [
+    UPLOAD_ROOT,
+    VALIDATION_DIR,
+    NORMALIZATION_DIR,
+    CONVERSION_DIR,
+    PROFILING_DIR,
+]:
+    d.mkdir(parents=True, exist_ok=True)
+
+# ─────────────────────────────
+# Auth helpers
+# ─────────────────────────────
+
+def require_user(request: Request) -> dict:
     user = request.session.get("user")
     if not user:
-        return RedirectResponse(
-            request.url_for("login_page"),
-            status_code=302
-        )
+        raise HTTPException(status_code=401)
     return user
 
-def upload_to_s3(file: UploadFile, key: str):
-    s3.upload_fileobj(file.file, BUCKET_NAME, key)
+def require_pro(user: dict) -> bool:
+    return bool(user.get("is_pro"))
 
 # ─────────────────────────────
-# Health Check
+# Health
 # ─────────────────────────────
 
-@app.api_route("/health", methods=["GET", "HEAD"])
+@app.get("/health")
 def health():
     return {"status": "ok"}
 
@@ -120,8 +116,7 @@ async def login_submit(
 ):
     email = email.lower().strip()
 
-    db = SessionLocal()
-
+    db: Session = SessionLocal()
     user = db.query(User).filter(User.email == email).first()
 
     if not user:
@@ -132,38 +127,33 @@ async def login_submit(
         )
         db.add(user)
         db.commit()
-        db.refresh(user)  # ✅ important
+        db.refresh(user)
 
-    # ⬇️ extract data while session is alive
-    user_data = {
+    session_user = {
         "email": user.email,
         "name": user.name,
+        "is_pro": False  # wired later via Stripe
     }
 
     db.close()
 
-    request.session["user"] = user_data
-
+    request.session["user"] = session_user
 
     return RedirectResponse(
         "/datasentinel/dashboard",
         status_code=303
     )
 
-
-
 @app.get("/logout")
 async def logout(request: Request):
     request.session.clear()
-    return RedirectResponse(
-        request.url_for("index"),
-        status_code=303
-    )
+    response = RedirectResponse("/datasentinel", status_code=302)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 # ─────────────────────────────
 # Pages
 # ─────────────────────────────
-history = []
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -178,8 +168,6 @@ async def index(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     user = require_user(request)
-    if isinstance(user, RedirectResponse):
-        return user
 
     db = SessionLocal()
     stats = {
@@ -188,8 +176,6 @@ async def dashboard(request: Request):
         "normalization": db.query(func.count(NormalizedFile.id))
             .filter_by(email=user["email"]).scalar(),
         "conversion": db.query(func.count(ConvertedFile.id))
-            .filter_by(email=user["email"]).scalar(),
-        "prediction": db.query(func.count(PredictionResult.id))
             .filter_by(email=user["email"]).scalar(),
     }
     db.close()
@@ -200,70 +186,8 @@ async def dashboard(request: Request):
             "request": request,
             "user": user,
             "stats": stats,
-            "history": history,
             "now": datetime.utcnow()
         }
-    )
-
-# ─────────────────────────────
-# Conversion
-# ─────────────────────────────
-
-@app.get("/convert", response_class=HTMLResponse)
-async def convert_page(request: Request):
-    user = require_user(request)
-
-    db = SessionLocal()
-    records = (
-        db.query(ConvertedFile)
-        .filter_by(email=user["email"])
-        .order_by(ConvertedFile.created_at.desc())
-        .all()
-    )
-    db.close()
-
-    return templates.TemplateResponse(
-        "convert.html",
-        {
-            "request": request,
-            "user": user,
-            "records": records
-        }
-    )
-
-
-@app.post("/convert")
-async def convert_submit(
-    request: Request,
-    file: UploadFile = File(...),
-    target_format: str = Form(...)
-):
-    user = require_user(request)
-
-    os.makedirs("uploads", exist_ok=True)
-
-    uid = uuid.uuid4().hex
-    stored_name = f"{uid}_{file.filename}"
-    stored_path = f"uploads/{stored_name}"
-
-    with open(stored_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    db = SessionLocal()
-    db.add(
-        ConvertedFile(
-            email=user["email"],
-            original_file=file.filename,
-            converted_path=stored_path,
-            format=target_format
-        )
-    )
-    db.commit()
-    db.close()
-
-    return RedirectResponse(
-        "/datasentinel/convert",
-        status_code=303
     )
 
 # ─────────────────────────────
@@ -291,6 +215,7 @@ async def validation_page(request: Request):
             "records": records
         }
     )
+
 @app.post("/validation")
 async def run_validation(
     request: Request,
@@ -298,41 +223,43 @@ async def run_validation(
 ):
     user = require_user(request)
 
-    # Save file
-    unique_name = f"{uuid.uuid4()}_{file.filename}"
-    file_path = UPLOAD_DIR / unique_name
+    if not file.filename:
+        return RedirectResponse("/datasentinel/validation", status_code=303)
 
-    with open(file_path, "wb") as f:
+    uid = uuid.uuid4().hex
+    path = VALIDATION_DIR / f"{uid}_{file.filename}"
+
+    with open(path, "wb") as f:
         f.write(await file.read())
 
-    # Record result
     db = SessionLocal()
     record = ValidationResult(
         email=user["email"],
         input_file=file.filename,
         status="success"
     )
-
     db.add(record)
     db.commit()
+    db.refresh(record)
     db.close()
 
-    return RedirectResponse(
-        "/datasentinel/validation",
-        status_code=303
-    )
+    return RedirectResponse("/datasentinel/validation", status_code=303)
+
 # ─────────────────────────────
 # Normalization
 # ─────────────────────────────
+
 @app.get("/normalization", response_class=HTMLResponse)
 async def normalization_page(request: Request):
     user = require_user(request)
 
     db = SessionLocal()
-    records = db.query(NormalizedFile)\
-        .filter_by(email=user["email"])\
-        .order_by(NormalizedFile.created_at.desc())\
+    records = (
+        db.query(NormalizedFile)
+        .filter_by(email=user["email"])
+        .order_by(NormalizedFile.created_at.desc())
         .all()
+    )
     db.close()
 
     return templates.TemplateResponse(
@@ -343,6 +270,7 @@ async def normalization_page(request: Request):
             "records": records
         }
     )
+
 @app.post("/normalization")
 async def run_normalization(
     request: Request,
@@ -350,30 +278,103 @@ async def run_normalization(
 ):
     user = require_user(request)
 
+    if not file.filename:
+        return RedirectResponse("/datasentinel/normalization", status_code=303)
+
+    uid = uuid.uuid4().hex
+    input_path = NORMALIZATION_DIR / f"{uid}_{file.filename}"
+    output_path = NORMALIZATION_DIR / f"{uid}_normalized_{file.filename}"
+
+    with open(input_path, "wb") as f:
+        f.write(await file.read())
+
+    shutil.copyfile(input_path, output_path)
+
     db = SessionLocal()
     record = NormalizedFile(
         email=user["email"],
         input_file=file.filename,
-        normalized_file=f"normalized_{file.filename}",
+        normalized_file=str(output_path)
     )
     db.add(record)
     db.commit()
+    db.refresh(record)
     db.close()
 
     return RedirectResponse("/datasentinel/normalization", status_code=303)
 
 # ─────────────────────────────
+# Conversion
+# ─────────────────────────────
+
+@app.get("/convert", response_class=HTMLResponse)
+async def convert_page(request: Request):
+    user = require_user(request)
+
+    db = SessionLocal()
+    records = (
+        db.query(ConvertedFile)
+        .filter_by(email=user["email"])
+        .order_by(ConvertedFile.created_at.desc())
+        .all()
+    )
+    db.close()
+
+    return templates.TemplateResponse(
+        "convert.html",
+        {
+            "request": request,
+            "user": user,
+            "records": records
+        }
+    )
+
+@app.post("/convert")
+async def convert_submit(
+    request: Request,
+    file: UploadFile = File(...),
+    target_format: str = Form(...)
+):
+    user = require_user(request)
+
+    if not file.filename:
+        return RedirectResponse("/datasentinel/convert", status_code=303)
+
+    uid = uuid.uuid4().hex
+    path = CONVERSION_DIR / f"{uid}_{file.filename}"
+
+    with open(path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    db = SessionLocal()
+    record = ConvertedFile(
+        email=user["email"],
+        original_file=file.filename,
+        converted_path=str(path),
+        format=target_format
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    db.close()
+
+    return RedirectResponse("/datasentinel/convert", status_code=303)
+
+# ─────────────────────────────
 # Profiling
 # ─────────────────────────────
+
 @app.get("/profiling", response_class=HTMLResponse)
 async def profiling_page(request: Request):
     user = require_user(request)
 
     db = SessionLocal()
-    records = db.query(ProfileResult)\
-        .filter_by(email=user["email"])\
-        .order_by(ProfileResult.created_at.desc())\
+    records = (
+        db.query(ProfileResult)
+        .filter_by(email=user["email"])
+        .order_by(ProfileResult.created_at.desc())
         .all()
+    )
     db.close()
 
     return templates.TemplateResponse(
@@ -384,6 +385,7 @@ async def profiling_page(request: Request):
             "records": records
         }
     )
+
 @app.post("/profiling")
 async def run_profiling(
     request: Request,
@@ -391,25 +393,32 @@ async def run_profiling(
 ):
     user = require_user(request)
 
+    if not file.filename:
+        return RedirectResponse("/datasentinel/profiling", status_code=303)
+
+    uid = uuid.uuid4().hex
+    path = PROFILING_DIR / f"{uid}_{file.filename}"
+
+    with open(path, "wb") as f:
+        f.write(await file.read())
+
     db = SessionLocal()
     record = ProfileResult(
         email=user["email"],
         input_file=file.filename,
-        profile_url=f"/profiles/{file.filename}.html"
+        profile_url=f"/profiles/{uid}"
     )
     db.add(record)
     db.commit()
+    db.refresh(record)
     db.close()
 
     return RedirectResponse("/datasentinel/profiling", status_code=303)
 
 # ─────────────────────────────
-# Prediction
+# Prediction (PRO)
 # ─────────────────────────────
-def require_pro(user):
-    if not user.get("is_pro"):
-        return False
-    return True
+
 @app.get("/prediction", response_class=HTMLResponse)
 async def prediction_page(request: Request):
     user = require_user(request)
@@ -427,6 +436,7 @@ async def prediction_page(request: Request):
             "user": user
         }
     )
+
 @app.get("/prediction/locked", response_class=HTMLResponse)
 async def prediction_locked(request: Request):
     user = require_user(request)
@@ -439,7 +449,6 @@ async def prediction_locked(request: Request):
         }
     )
 
-
 # ─────────────────────────────
 # Subscription
 # ─────────────────────────────
@@ -447,9 +456,6 @@ async def prediction_locked(request: Request):
 @app.get("/subscribe/pro")
 async def subscribe_pro(request: Request):
     user = require_user(request)
-    if isinstance(user, RedirectResponse):
-        return user
-
     return RedirectResponse(
         create_checkout_session(user["email"]),
         status_code=303
@@ -466,7 +472,6 @@ async def reports_page(request: Request):
     db = SessionLocal()
     history = []
 
-    # Validation
     for r in db.query(ValidationResult).filter_by(email=user["email"]).all():
         history.append({
             "module": "Validation",
@@ -476,17 +481,15 @@ async def reports_page(request: Request):
             "view": f"/datasentinel/view/validation/{r.id}"
         })
 
-    # Normalization
     for r in db.query(NormalizedFile).filter_by(email=user["email"]).all():
         history.append({
             "module": "Normalization",
             "file": r.input_file,
-            "status": r.status,
+            "status": "success",
             "created_at": r.created_at,
             "view": f"/datasentinel/view/normalization/{r.id}"
         })
 
-    # Conversion
     for r in db.query(ConvertedFile).filter_by(email=user["email"]).all():
         history.append({
             "module": "Conversion",
@@ -496,19 +499,17 @@ async def reports_page(request: Request):
             "view": f"/datasentinel/view/conversion/{r.id}"
         })
 
-    # Profiling
     for r in db.query(ProfileResult).filter_by(email=user["email"]).all():
         history.append({
             "module": "Profiling",
             "file": r.input_file,
-            "status": r.status,
+            "status": "success",
             "created_at": r.created_at,
             "view": f"/datasentinel/view/profiling/{r.id}"
         })
 
-        db.close()
+    db.close()
 
-    # Sort newest first
     history.sort(key=lambda x: x["created_at"], reverse=True)
 
     return templates.TemplateResponse(
@@ -519,6 +520,7 @@ async def reports_page(request: Request):
             "history": history
         }
     )
+
 # ─────────────────────────────
 # Views
 # ─────────────────────────────
@@ -564,9 +566,14 @@ async def view_profiling(request: Request, id: int):
             "record": r
         }
     )
+ALLOWED_MODULES = {"validation", "normalization", "conversion", "profiling"}
+
 @app.get("/view/{module}/{id}", response_class=HTMLResponse)
 async def view_placeholder(request: Request, module: str, id: int):
     user = require_user(request)
+
+    if module not in ALLOWED_MODULES:
+        return RedirectResponse("/datasentinel/reports", status_code=302)
 
     return templates.TemplateResponse(
         "view_placeholder.html",
@@ -581,14 +588,14 @@ async def view_placeholder(request: Request, module: str, id: int):
 # ─────────────────────────────
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
-    user = require_user(request)
+    try:
+        user = require_user(request)
+    except HTTPException:
+        return RedirectResponse("/datasentinel/login", status_code=302)
 
     return templates.TemplateResponse(
         "settings.html",
-        {
-            "request": request,
-            "user": user
-        }
+        {"request": request, "user": user}
     )
 # ─────────────────────────────
 # Logout
@@ -596,7 +603,6 @@ async def settings_page(request: Request):
 @app.get("/logout")
 async def logout(request: Request):
     request.session.clear()
-
     response = RedirectResponse("/datasentinel", status_code=302)
     response.headers["Cache-Control"] = "no-store"
     return response
