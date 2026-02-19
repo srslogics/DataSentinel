@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Query, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 # ✅ Load env
 load_dotenv()
@@ -20,12 +21,23 @@ AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
 BUCKET_NAME = os.getenv("S3_BUCKET")
+AWS_BACKEND = "http://datasentinel-alb-84389164.ap-south-1.elb.amazonaws.com"
 
 s3 = boto3.client(
     "s3",
     aws_access_key_id=AWS_ACCESS_KEY,
     aws_secret_access_key=AWS_SECRET_KEY,
     region_name="ap-south-1"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://datasentinel.srslogics.com"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 UPLOAD_PREFIX = "converted/"

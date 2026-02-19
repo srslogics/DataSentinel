@@ -15,7 +15,9 @@ import uuid
 import os
 import shutil
 import logging
-
+import requests
+import boto3
+import tempfile
 from database import SessionLocal, engine
 from models import (
     Base,
@@ -52,6 +54,15 @@ BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
+AWS_BACKEND = os.environ.get("AWS_BACKEND")
+S3_BUCKET = os.environ.get("S3_BUCKET")
+
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.environ.get("AWS_ACCESS_KEY"),
+    aws_secret_access_key=os.environ.get("AWS_SECRET_KEY"),
+    region_name="ap-south-1"
+)
 # ─────────────────────────────
 # Database init (MVP only)
 # ─────────────────────────────
@@ -217,26 +228,45 @@ async def validation_page(request: Request):
     )
 
 @app.post("/validation")
-async def run_validation(
-    request: Request,
-    file: UploadFile = File(...)
-):
+async def run_validation(request: Request, file: UploadFile = File(...)):
     user = require_user(request)
 
     if not file.filename:
         return RedirectResponse("/datasentinel/validation", status_code=303)
 
     uid = uuid.uuid4().hex
-    path = VALIDATION_DIR / f"{uid}_{file.filename}"
+    temp_path = f"/tmp/{uid}_{file.filename}"
 
-    with open(path, "wb") as f:
+    # save temp file
+    with open(temp_path, "wb") as f:
         f.write(await file.read())
 
+    # upload to S3
+    s3_key = f"uploads/{uid}_{file.filename}"
+    s3.upload_file(temp_path, S3_BUCKET, s3_key)
+
+    print("Uploaded to S3:", s3_key)
+
+    # call AWS backend validation
+    try:
+        response = requests.post(
+            f"{AWS_BACKEND}/validate",
+            json={
+                "bucket": S3_BUCKET,
+                "name": s3_key
+            },
+            timeout=600
+        )
+        print("Backend validation response:", response.text)
+    except Exception as e:
+        print("Backend error:", str(e))
+
+    # save record in DB
     db = SessionLocal()
     record = ValidationResult(
         email=user["email"],
         input_file=file.filename,
-        status="success"
+        status="processed"
     )
     db.add(record)
     db.commit()
@@ -244,6 +274,7 @@ async def run_validation(
     db.close()
 
     return RedirectResponse("/datasentinel/validation", status_code=303)
+
 
 # ─────────────────────────────
 # Normalization
