@@ -23,6 +23,21 @@ AWS_REGION = os.getenv("AWS_REGION")
 BUCKET_NAME = os.getenv("S3_BUCKET")
 AWS_BACKEND = "http://datasentinel-alb-84389164.ap-south-1.elb.amazonaws.com"
 
+
+UPLOAD_PREFIX = "converted/"
+SUPPORTED_EXTENSIONS = [".csv", ".parquet", ".xlsx"]
+SUPPORTED_FORMATS = ('.csv', '.json', '.xlsx', '.parquet')
+
+# ✅ Module Imports
+from app.routes.conversion import read_from_buffer, convert_to_buffer, get_extension
+from app.routes.profiling import load_data, profile_dataframe, detect_drift, upload_json_to_gcs
+from app.routes.normalization import normalize_file
+from app.routes.validation import validate
+from app.routes.prediction import predict_from_parquet, download_blob
+
+# ✅ FastAPI init
+app = FastAPI()
+
 s3 = boto3.client(
     "s3",
     aws_access_key_id=AWS_ACCESS_KEY,
@@ -39,20 +54,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-UPLOAD_PREFIX = "converted/"
-SUPPORTED_EXTENSIONS = [".csv", ".parquet", ".xlsx"]
-SUPPORTED_FORMATS = ('.csv', '.json', '.xlsx', '.parquet')
-
-# ✅ Module Imports
-from app.routes.conversion import read_from_buffer, convert_to_buffer, get_extension
-from app.routes.profiling import load_data, profile_dataframe, detect_drift, upload_json_to_gcs
-from app.routes.normalization import normalize_file
-from app.routes.validation import validate
-from app.routes.prediction import predict_from_parquet, download_blob
-
-# ✅ FastAPI init
-app = FastAPI()
 
 # ===============================
 # 🔥 S3 UTILS
