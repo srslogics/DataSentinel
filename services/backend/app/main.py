@@ -186,15 +186,20 @@ async def validate_file(request: Request):
     bucket_name = data.get("bucket")
     file_name = data.get("name")
 
+    print("Incoming validation request:", bucket_name, file_name)
+
     if not bucket_name or not file_name:
         raise HTTPException(status_code=400, detail="Missing 'bucket' or 'name'")
 
     if not file_name.endswith(SUPPORTED_FORMATS):
         raise HTTPException(status_code=400, detail="Unsupported file format")
 
+    # download file from S3
     tmp_path = f"/tmp/{os.path.basename(file_name)}"
+    print("Downloading from S3:", bucket_name, file_name)
     s3.download_file(bucket_name, file_name, tmp_path)
 
+    # read dataframe
     if file_name.endswith(".csv"):
         df = pd.read_csv(tmp_path)
     elif file_name.endswith(".json"):
@@ -204,19 +209,41 @@ async def validate_file(request: Request):
     elif file_name.endswith(".parquet"):
         df = pd.read_parquet(tmp_path)
 
-    with open("validation_rules.json") as f:
+    print("File loaded. Rows:", len(df))
+
+    # 🔥 locate validation_rules.json safely
+    import os
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    rules_path = os.path.join(BASE_DIR, "validation_rules.json")
+
+    print("Looking for rules file at:", rules_path)
+
+    if not os.path.exists(rules_path):
+        raise Exception(f"validation_rules.json NOT FOUND at {rules_path}")
+
+    with open(rules_path) as f:
         rules = json.load(f)
 
+    print("Rules loaded successfully")
+
+    # run validation
     result = validate(df, rules)
+    print("Validation completed")
+
+    # upload result to S3
+    result_key = f"validated/{os.path.basename(file_name)}.json"
 
     s3.put_object(
         Bucket=bucket_name,
-        Key=f"validation-results/{file_name}.results.json",
+        Key=result_key,
         Body=json.dumps(result, indent=2),
         ContentType="application/json"
     )
 
+    print("Result uploaded to:", result_key)
+
     return JSONResponse(content={"status": "success", "file": file_name})
+
 
 
 # ===============================
