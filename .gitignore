@@ -1,4 +1,9 @@
 services/backend/.env
-# macOS
 .DS_Store
 **/.DS_Store
+__pycache__/
+*.pyc
+.env
+.DS_Store
+node_modules/
+uploads/
