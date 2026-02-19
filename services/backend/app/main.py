@@ -213,7 +213,6 @@ async def validate_file(request: Request):
     print("File loaded. Rows:", len(df))
 
     # 🔥 locate validation_rules.json safely
-    import os
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     rules_path = os.path.join(BASE_DIR, "validation_rules.json")
 
