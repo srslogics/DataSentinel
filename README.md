@@ -199,9 +199,9 @@ PRO-only features:
 
 ## 🚀 Production URLs
 
-* https://srslogics.com/datasentinel
-* https://srslogics.com/datasentinel/docs
-* https://srslogics.com/datasentinel/dashboard
+* https://datasentinel.srslogics.com/
+* https://datasentinel.srslogics.com/docs
+* https://datasentinel.srslogics.com/dashboard
 
 
 ---
