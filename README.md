@@ -4,7 +4,7 @@
 
 This document provides a complete backend deployment guide to run DataSentinel on AWS and serve it at:
 
-https://srslogics.com/datasentinel
+https://datasentinel.srslogics.com/
 
 ---
 
